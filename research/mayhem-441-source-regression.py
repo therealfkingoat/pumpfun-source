@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Small source-level regression guard for the merged Mayhem 441 recovery.
 
-This intentionally does not claim binary equivalence.  It protects the source
+This intentionally does not claim binary equivalence. It protects the source
 routing that was used to close O0083/O0084: the v2 handlers live in the shared
 pump_interface_v2 module and the obsolete standalone BuyV2 handler is absent.
 
 Run from the repository root:
     python -B research/mayhem-441-source-regression.py
 """
+import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -15,22 +16,22 @@ V2 = ROOT / "programs/mayhem/src/instructions/pump_interface_v2.rs"
 BUY = ROOT / "programs/mayhem/src/instructions/buy_v2.rs"
 
 
-def require(path: Path, needle: str) -> None:
+def require_pattern(path: Path, pattern: str) -> None:
     text = path.read_text(encoding="utf-8")
-    if needle not in text:
-        raise SystemExit(f"missing {needle!r} in {path}")
+    if not re.search(pattern, text):
+        raise SystemExit(f"missing pattern {pattern!r} in {path}")
 
 
-def forbid(path: Path, needle: str) -> None:
+def forbid_pattern(path: Path, pattern: str) -> None:
     text = path.read_text(encoding="utf-8")
-    if needle in text:
-        raise SystemExit(f"unexpected {needle!r} in {path}")
+    if re.search(pattern, text):
+        raise SystemExit(f"unexpected pattern {pattern!r} in {path}")
 
 
-require(V2, "pub fn buy_v2_handler(")
-require(V2, "pub fn sell_v2_handler(")
-require(V2, "if native {")
-require(V2, "emit_cpi!(event)")
-forbid(BUY, "pub fn handler(ctx:Context<BuyV2>")
+require_pattern(V2, r"\bpub\s+fn\s+buy_v2_handler\s*\(")
+require_pattern(V2, r"\bpub\s+fn\s+sell_v2_handler\s*\(")
+require_pattern(V2, r"\bif\s+native\s*\{")
+require_pattern(V2, r"emit_cpi!\s*\(\s*event\s*\)")
+forbid_pattern(BUY, r"\bpub\s+fn\s+handler\s*\(\s*ctx\s*:\s*Context\s*<\s*BuyV2\s*>\s*\)")
 
 print("Mayhem 441 source regression checks: PASS")
